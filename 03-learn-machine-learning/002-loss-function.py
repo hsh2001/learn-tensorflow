@@ -19,4 +19,8 @@ def sum_squares_error(y, t):
 def cross_entropy_error(y, t):
     # 주의! y 원소에 0.0001처럼 아주 작은 값을 더해서
     # y원소의 값이 0이 되지 않도록 한다.
+    # y 원소중 하나라도 0이면 log(y_k)의 값은 음의 무한대.
+    # 참고로 np.log는 밑이 e인 자연로그이다.
+    # 보통 밑이 10인 경우 밑을 생략하여 log로 작성하고 밑이 e일 경우 ln으로 작성하는 데,
+    # np에서는 log가 상용로그가 아니고 자연로그임에 주의.
     return -np.sum(t * np.log(y + 1e-7))
