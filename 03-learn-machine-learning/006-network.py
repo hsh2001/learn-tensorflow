@@ -99,7 +99,7 @@ class LayerNetwork:
         batch_mask = np.random.choice(self.input_size, batch_size)
         x_batch = x_train[batch_mask]
         t_batch = t_train[batch_mask]
-        print('loss', network.get_loss(x_batch, t_batch))
+        print('loss', self.get_loss(x_batch, t_batch))
         self.fit(x_batch, t_batch)
 
 
