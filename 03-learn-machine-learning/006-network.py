@@ -44,31 +44,42 @@ class LayerNetwork:
         self,
         input_size,
         output_size,
-        hidden_size,
+        hidden_size_list: list[int],
         learning_late=0.01,
         weight_init_std=0.01,
     ) -> None:
         self.learning_late = learning_late
         self.input_size = input_size
         self.output_size = output_size
-        self.hidden_size = hidden_size
-        self.params = {
-            'W1': weight_init_std * np.random.rand(input_size, hidden_size),
-            'b1': np.zeros(hidden_size),
-            'W2': weight_init_std * np.random.rand(hidden_size, output_size),
-            'b2': np.zeros(output_size),
-        }
+        self.hidden_size_list = hidden_size_list
+        hidden_layer_count = len(hidden_size_list)
+        self.hidden_layer_count = hidden_layer_count
+        self.params = {}
+        prev_nodes = input_size
+
+        for i in range(hidden_layer_count):
+            nodes = hidden_size_list[i]
+            self.params['W' + str(i)] = weight_init_std * \
+                np.random.rand(prev_nodes, nodes)
+            self.params['b' + str(i)] = np.zeros(nodes)
+            prev_nodes = hidden_size_list[i]
+
+        self.params['W' + str(hidden_layer_count)] = weight_init_std * \
+            np.random.rand(prev_nodes, output_size)
+        self.params['b' + str(hidden_layer_count)] = np.zeros(output_size)
 
     def predict(self, x):
-        W1 = self.params['W1']
-        W2 = self.params['W2']
-        b1 = self.params['b1']
-        b2 = self.params['b2']
-        a1 = np.dot(x, W1) + b1
-        z1 = sigmoid(a1)
-        a2 = np.dot(z1, W2) + b2
-        z2 = sigmoid(a2)
-        return z2
+        y = x
+        for i in range(self.hidden_layer_count):
+            w = self.params['W' + str(i)]
+            b = self.params['b' + str(i)]
+            y = sigmoid(np.dot(y, w) + b)
+
+        w = self.params['W' + str(self.hidden_layer_count)]
+        b = self.params['b' + str(self.hidden_layer_count)]
+        y = softmax(np.dot(y, w) + b)
+
+        return y
 
     def get_loss(self, x, t):
         y = self.predict(x)
@@ -82,25 +93,34 @@ class LayerNetwork:
 
     def get_gradient(self, x, t):
         def loss_w(w): return self.get_loss(x, t)
-        return {
-            'W1': numerical_gradient(loss_w, self.params['W1']),
-            'b1': numerical_gradient(loss_w, self.params['b1']),
-            'W2': numerical_gradient(loss_w, self.params['W2']),
-            'b2': numerical_gradient(loss_w, self.params['b2']),
-        }
+
+        gradient = {}
+
+        def set_gradient(key: str):
+            gradient[key] = numerical_gradient(
+                loss_w,
+                self.params[key]
+            )
+
+        for i in range(self.hidden_layer_count + 1):
+            set_gradient('W' + str(i))
+            set_gradient('b' + str(i))
+
+        return gradient
 
     def fit(self, x_train, t_train):
         gradient = self.get_gradient(x_train, t_train)
 
-        for key in ('W1', 'b1', 'W2', 'b2'):
+        for key in gradient.keys():
             self.params[key] -= self.learning_late * gradient[key]
 
     def mini_batch_fit(self, x_train, t_train, batch_size):
         batch_mask = np.random.choice(self.input_size, batch_size)
         x_batch = x_train[batch_mask]
         t_batch = t_train[batch_mask]
-        print('loss', self.get_loss(x_batch, t_batch))
+        prev_loss = self.get_loss(x_batch, t_batch)
         self.fit(x_batch, t_batch)
+        print('loss diff :', self.get_loss(x_batch, t_batch) - prev_loss)
 
 
 (x_train, t_train), (x_test, t_test) = load_mnist(
@@ -111,11 +131,12 @@ class LayerNetwork:
 network = LayerNetwork(
     input_size=x_train.shape[1],
     output_size=t_train.shape[1],
-    hidden_size=10,
+    hidden_size_list=[32, 16],
+    learning_late=0.001
 )
 
 for i in range(1000):
-    print(i, end=' ')
     network.mini_batch_fit(x_train, t_train, 100)
-    if 0 == (i % 10):
-        print('accuracy', 100 * network.get_accuracy(x_test, t_test), '%')
+    if i != 0 and 0 == (i % 20):
+        accuracy = 100 * network.get_accuracy(x_test, t_test)
+        print('accuracy', accuracy, '%')
